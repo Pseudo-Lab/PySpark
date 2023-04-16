@@ -18,6 +18,8 @@ Big Data Analysis using PySpark (6th Academic Study)
   - MacOS 경우 `brew install spark`로 설치 가능
   - 경로 설정 해야함
 
+<br>
+
 ### 2. 경로 설정
 
 - `open ~/.zshrc` 또는 `open ~/.bashrc`로 실행
@@ -47,6 +49,8 @@ export PYSPARK_PYTHON="/Users/hyunseokjung/opt/anaconda3/envs/pyspark/bin/python
 
 ```
 
+<br>
+
 ### 3. 가상 환경 설치
 
 - 가상 환경에 pyspark 설치. 단, 해당 버전과 맞춰야함을 주의. [^1]
@@ -67,6 +71,19 @@ pip install ipykernel
 python -m ipykernel install --user --name 가상환경이름 --display-name 표시할 가상환경 이름
 
 ```
+
+### 4. 도커 사용하기
+
+- 우분투(20.04) 환경에서 파이썬, 자바, 하둡, 스파크 등이 설치되어 있는 이미지를 의미한다.
+
+  - `Windows` : `docker pull ingu627/hadoop:spark3.3.0`
+- `MacOS` : `docker pull ingu627/hadoop:pyspark-mac`
+
+<br>
+
+<br>
+
+<br>
 
 ## Reference
 
