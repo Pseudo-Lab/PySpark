@@ -9,10 +9,10 @@ if __name__ == "__main__":
         .appName("mysql") \
         .getOrCreate()
 
-    df = spark.read.format("jdbc") \
+    df = spark.read.format("jdbc") \ 
         .options(
         url="jdbc:mysql://localhost:3306/learningsparkdb",
-        driver = "com.mysql.jdbc.Driver",
+        driver="com.mysql.jdbc.Driver",
         dbtable="Department",
         user="root",
         password="0000").load()
