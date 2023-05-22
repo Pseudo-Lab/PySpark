@@ -52,7 +52,6 @@ if __name__ == "__main__":
         airportsna.IATA == foo.origin) \
         .select("City", "State", "date", "delay", "distance", "destination").show()
 
-
     # spark.sql("""
     # DROP TABLE IF EXISTS departureDelaysWindow
     # CREATE TABLE departureDelaysWindow AS
