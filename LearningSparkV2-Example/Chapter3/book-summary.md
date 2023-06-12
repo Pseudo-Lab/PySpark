@@ -1,6 +1,5 @@
 # 3장 Apache Spark’s Structured APIs
-- Apache Spark가 어떻게 생겨났고, Spark의 버전들의 특성을 간략하게 소개하고 있다.   
-- 새로운 API를 살펴보기 전에 RDD API 모델을 살펴보자고 한다.   
+이 장에서는 Apache Spark가 어떻게 생겨났고, Spark의 버전들의 특성을 간략하게 소개하고 있다. 그리고 새로운 API를 살펴보기 전에 RDD API 모델을 살펴보겠다.   
 
 ## 1. Spark: What’s Underneath an RDD?
 

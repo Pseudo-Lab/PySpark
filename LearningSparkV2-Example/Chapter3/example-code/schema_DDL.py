@@ -36,3 +36,4 @@ if __name__ == "__main__":
  
    blogs_df.withColumn("Big Hitters", (expr("Hits > 10000"))).show()
    print(blogs_df.schema)
+   
