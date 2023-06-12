@@ -1,0 +1,222 @@
+#스트리밍 쿼리를 정의하는데 필요한 다섯 단계
+
+#1.입력소스지정
+spark = SparkSession…
+
+lines = (spark.readStream.format(“socket”)
+
+.option(“host”,”localhost”)
+
+.option(“port”,9999)
+
+.load())
+
+
+#2. 데이터변형
+from pyspark.sql.functions import *
+
+words = lines.select(split(col(“value”), “\\s”).alias(“word”))
+
+counts = words.groupBy(“word”).count()
+
+
+#3. 출력 싱크와 모드 결정
+writer = counts.writeStream.format("console").outputMode("complete")
+
+
+#4. 처리 세부사항 결정
+checkpointDir = '/path'
+writer2 = (writer
+    .trigger(processingTime="1 second")
+    .option("checkpointLocation", checkpointDir))
+
+#5. 쿼리시작
+streamingQuery = writer2.start()
+
+##종합예제
+##소켓에서 텍스트데이터 스트림을 읽어들이고, 단어 갯수를 세어서 콘솔에 출력하는 코드
+from pyspark.sql.functions import *
+
+# 1단계: 입력 소스 지정
+spark = SparkSession...
+lines = (spark
+         .readStream.format("socket")
+         .option("host", "localhost")
+         .option("port", 9999)
+         .load())
+
+# 2단계: 데이터 변형
+words = lines.select(split(col("value"), "\\s").alias("word"))
+counts = words.groupBy("word").count()
+checkpointDir = "..."
+
+# 3단계: 출력 싱크와 모드 결정 (전체 모드)
+# 4단계: 처리 세부사항 지정
+streamingQuery = (counts
+                  .writeStream
+                  .format("console")
+                  .outputMode("complete")
+                  .trigger(processingTime="1 second")
+                  .option("checkpointLocation", checkpointDir)
+                  .start())
+
+# 5단계: 쿼리 시작
+streamingQuery.awaitTermination()
+
+
+
+#쿼리 재시작 사이 쿼리를 수정하는 법
+##ex) 입력중 잘못된 바이트 배열은 무시하도록 추가.
+from pyspark.sql import *
+from pyspark.sql.types import BooleanType
+from pyspark.sql.functions import *
+
+### 잘못된 바이트 배열을 무시하기 위한 udf 함수
+def isCorruptedUdf(value):
+    return False
+
+spark = (SparkSession
+         .builder
+         .appName("CountWord")
+         .getOrCreate())
+
+spark.udf.register("isCorruptedUdf", isCorruptedUdf, BooleanType())
+
+lines = (spark
+         .readStream.format("socket")
+         .option("host", "localhost")
+         .option("port", 9999)
+         .load())
+
+# add transformation
+filteredLines = lines.filter("isCorruptedUdf(value) = False")
+
+
+# words = lines.select(split(col("value"), "\\s").alias("word"))
+words = filteredLines.select(split(col("value"), "\\s").alias("word"))
+counts = words.groupBy("word").count()
+checkpointDir = "..."
+
+
+streamingQuery = (counts
+                  .writeStream
+                  .format("console")
+                  .outputMode("complete")
+                  .trigger(processingTime="1 second")
+                  .option("checkpointLocation", checkpointDir)
+                  .start())
+
+streamingQuery.awaitTermination()
+
+
+#소스와 싱크 옵션
+#ex) 매 트리거마다 100줄씩 출력하는 옵션을 추가하려면
+
+writeStream.format("console").option("numRows", "100"),,,
+
+
+#파일 기반의 정형화 스트리밍 처리 방법
+
+from pyspark.sql.types import *
+inputDirectoryOfJsonFiles = ...
+fileSchema = (StructType()
+ .add(StructField("key", IntegerType()))
+ .add(StructField("value", IntegerType())))
+inputDF = (spark
+ .readStream
+ .format("json")
+ .schema(fileSchema)
+ .load(inputDirectoryOfJsonFiles))
+
+
+#파일에 쓰기 예제
+outputDir = ...
+checkpointDir = ...
+resultDF = ...
+streamingQuery = (resultDF.writeStream
+ .format("parquet")
+ .option("path", outputDir) #"path" 옵션 대신 직접적으로 start(outputDir)에 지정할 수도 있다.
+ .option("checkpointLocation", checkpointDir)
+ .start())
+
+
+#카프카에서 읽기
+
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+                .config("spark.jars", "./jar/mysql-connector-j-8.0.32.jar") \
+                .master("local") \
+                .appName("mysql") \
+                .getOrCreate()
+
+inputDF = (spark
+           .readStream
+           .format("kafka")
+           .option("kafka.bootstrap.servers", "host1:port1")
+           .option("subscribe", "events")
+           .load())
+
+#카프카에서 쓰기
+counts = ...
+streamingQuery = (counts.
+                  selectExpr("cast(word as string) as key",
+                             "cast(count as string) as value")
+                  .writeStream
+                  .format("kafka")
+                  .option("kafka.bootstrap.servers", "host1:port1")
+                  .option("topic", "wordCounts")
+                  .outputMode("update")
+                  .option("checkpointLocation", checkpointDir)
+                  .start())
+
+#임의의 저장 시스템에 쓰기
+hostAddr = "<ip address>"
+keyspaceName = "<keyspace>"
+tableName = "<tableName>"
+
+spark.conf.set("spark.cassandra.connection.host", hostAddr)
+
+def writeCountsToCassandra(updatedCountsDF, batchId):
+    (updatedCountsDF
+     .write
+     .format("org.apache.spark.sql.cassandra")
+     .mode("append")
+     .options(table=tableName, keyspace=keyspaceName)
+     .save())
+
+streamingQuery = (counts
+                  .writeStream
+                  .foreachBatch(writeCountsToCassandra)
+                  .outputMode("update")
+                  .option("checkpointLocation", checkpointDir)
+                  .start())
+
+##foreach사용
+## 1. 함수사용
+def process_row(row):
+	# 이제 저장장치에 쓴다.
+	print("Processing row:", row)
+
+query = streamingDF.writeStream.foreach(process_row).start()
+
+
+## 2. ForeachWriter 클래스 사용
+class ForeachWriter:
+	def open(self, partitionId, epochId):
+	# 데이터 저장소에 대한 접속을 열어놓는다.
+	# 쓰기가 계속되어야 하면 true를 리턴한다.
+	# 파이썬에서는 이 함수는 선택 사항이다.
+	# 지정되어 있지 않다면 자동적으로 쓰기는 계속될 것이다.
+	return true
+
+def process(self,row):
+	#열린 접속을 사용해서 저장소에 문자열을 쓴다.
+	# 이 함수는 필수
+	print("Processing row:", row)
+
+def close(self, error):
+	# 접속을 닫는다. 이 함수는 선택
+	pass
+
+resultDF.writeStream.foreach(ForeachWriter()).start()
