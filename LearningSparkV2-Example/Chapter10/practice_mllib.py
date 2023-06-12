@@ -22,12 +22,13 @@ if __name__ == "__main__":
         .config('spark.some.config.option', 'some-value') \
         .getOrCreate()
 
+    ## 데이터 수집 및 탐색
     filePath = "/root/data/learning-spark-v2/sf-airbnb/sf-airbnb-clean.parquet/"
     airbnbDF = spark.read.parquet(filePath)
     airbnbDF.select("neighbourhood_cleansed", "room_type", "bedrooms",
-                    "bathrooms", "number_of_reviews", "price") \
-        .show(5)
+                    "bathrooms", "number_of_reviews", "price").show(5)
 
+    # 학습 및 테스트 데이터세트 생성
     trainDF, testDF = airbnbDF.randomSplit([.8, .2], seed=42)
     print(
         f"There are {trainDF.count()} rows in the training set, and {testDF.count()} in the test set")
@@ -48,6 +49,12 @@ if __name__ == "__main__":
         f"The formula for the linear regression line is price = {m}*bedrooms + {b}")
 
     # 파이프라인 생성
+    pipeline = Pipeline(stages=[stringIndexer, oheEncoder, vecAssembler, lr])
+    pipelineModel = pipeline.fit(trainDF)
+
+    predDF = pipelineModel.transform(testDF)
+    predDF.select("bedrooms", "features", "price", "prediction").show(10)
+
     categoricalCols = [field for (field, dataType)
                        in trainDF.dtypes if dataType == "string"]
     indexOutputCols = [x + "Index" for x in categoricalCols]
@@ -64,12 +71,6 @@ if __name__ == "__main__":
     vecAssembler = VectorAssembler(
         inputCols=assemblerInputs, outputCol="features")
 
-    # pipeline = Pipeline(stages=[stringIndexer, oheEncoder, vecAssembler, lr])
-    # pipelineModel = pipeline.fit(trainDF)
-
-    # predDF = pipelineModel.transform(testDF)
-    # predDF.select("bedrooms", "features", "price", "prediction").show(10)
-
     rFormula = RFormula(formula="price ~ .",
                         featuresCol="features",
                         labelCol="price",
@@ -77,9 +78,7 @@ if __name__ == "__main__":
 
     lr = LinearRegression(labelCol="price", featuresCol="features")
     pipeline = Pipeline(stages=[stringIndexer, oheEncoder, vecAssembler, lr])
-    # RFormula 사용할 때
-    # pipeline = Pipeline(stages =[rRormula, lr])
-
+    
     pipelineModel = pipeline.fit(trainDF)
     predDF = pipelineModel.transform(testDF)
     predDF.select("features", "price", "prediction").show(5)
@@ -93,32 +92,38 @@ if __name__ == "__main__":
     rmse = regressionEvaluator.evaluate(predDF)
     print(f"RMSE is {rmse:.1f}")
 
+    # R^2
     r2 = regressionEvaluator.setMetricName("r2").evaluate(predDF)
     print(f"R2 is {r2}")
 
     # 모델 저장 및 로드
-    # pipelinePath = "/tmp/lr-pipeline-model"
-    # pipelineModel.write().overwrite().save(pipelinePath)
+    pipelinePath = "/tmp/lr-pipeline-model"
+    pipelineModel.write().overwrite().save(pipelinePath)
 
-    # savedPipelineModel = PipelineModel.load(pipelinePath)
+    savedPipelineModel = PipelineModel.load(pipelinePath)
 
     # 하이퍼파라미터 튜닝
     dt = DecisionTreeRegressor(labelCol="price")
+    
+    ## 숫자 열만 필터링 (가격, 레이블 제외)
     numericCols = [field for (field, dataType) in trainDF.dtypes
                    if ((dataType == "double") & (field != "price"))]
 
+    ## 위 정의한 StringIndexer 출력과 숫자 열 결합
     assemblerInputs = indexOutputCols + numericCols
-    vecAssembler = VectorAssembler(
-        inputCols=assemblerInputs, outputCol="features")
+    vecAssembler = VectorAssembler(inputCols=assemblerInputs, outputCol="features")
 
+    # 단계를 파이프라인으로 결합
     stages = [stringIndexer, vecAssembler, dt]
     pipeline = Pipeline(stages=stages)
+    
+    # MaxBin 오류 처리를 위해 40으로 설정
     dt.setMaxBins(40)
     pipelineModel = pipeline.fit(trainDF)
 
     dtModel = pipelineModel.stages[-1]
     print(dtModel.toDebugString)
-
+    
     # 모델에서 기능 중요도 점수 추출
     featureImp = pd.DataFrame(
         list(zip(vecAssembler.getInputCols(), dtModel.featureImportances)),
