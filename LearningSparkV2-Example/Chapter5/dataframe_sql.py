@@ -8,9 +8,11 @@ if __name__ == "__main__":
         .appName("sparkSQL") \
         .getOrCreate()
 
+    # 파일 경로
     tripdelaysFilePath = "/data/learning-spark-v2/flights/departuredelays.csv"
     airportsnaFilePath = "/data/learning-spark-v2/flights/airport-codes-na.txt"
 
+    # 파일 불러오기
     airportsna = spark.read \
         .format("csv") \
         .options(header="true", inferSchema="true", sep="\t") \
@@ -29,6 +31,7 @@ if __name__ == "__main__":
 
     departureDelays.createOrReplaceTempView("departureDelays")
 
+    # SQL 쿼리문
     foo = departureDelays \
         .filter(expr("""
         origin == 'SEA' AND destination == 'SFO' and date like '01010%' and delay > 0"""))
